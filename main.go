@@ -9,6 +9,7 @@ import (
 
 	"shortlink/config"
 	"shortlink/routes"
+	"shortlink/validators"
 )
 
 func main() {
@@ -19,6 +20,10 @@ func main() {
 	config.ConnectDB()
 	config.ConnectRedis()
 	config.RunMigrations()
+
+	if err := validators.RegisterCustomValidators(); err != nil {
+		log.Fatalf("Gagal mendaftarkan custom validators: %v", err)
+	}
 
 	r := gin.Default()
 	routes.SetupRoutes(r)

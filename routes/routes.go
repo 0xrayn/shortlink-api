@@ -21,8 +21,9 @@ func SetupRoutes(r *gin.Engine) {
 	// Redirect endpoint - public, dengan rate limiting (60 request per menit per IP)
 	r.GET("/:code", middleware.RateLimit(60, time.Minute), handlers.RedirectLink)
 
-	// Stats - public juga, biar bisa dicek tanpa login
+	// Stats & QR code - public juga, biar bisa dicek tanpa login
 	r.GET("/:code/stats", handlers.GetLinkStats)
+	r.GET("/:code/qr", handlers.GetQRCode)
 
 	// Protected routes
 	auth := r.Group("/")
@@ -31,5 +32,6 @@ func SetupRoutes(r *gin.Engine) {
 		// Rate limit pembuatan link: max 10 per menit per IP, mencegah abuse
 		auth.POST("/shorten", middleware.RateLimit(10, time.Minute), handlers.CreateLink)
 		auth.GET("/my-links", handlers.GetMyLinks)
+		auth.DELETE("/:code", handlers.DeleteLink)
 	}
 }

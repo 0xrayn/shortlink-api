@@ -82,7 +82,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://anthropic.com/news\"\n}"
+              "raw": "{\n  \"url\": \"https://github.com/0xrayn/shortlink-api\"\n}"
             },
             "url": "{{baseUrl}}/shorten"
           },
@@ -116,7 +116,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://docs.claude.com\",\n  \"code\": \"claude-docs\"\n}"
+              "raw": "{\n  \"url\": \"https://github.com/0xrayn/shortlink-api\",\n  \"code\": \"my-repo\"\n}"
             },
             "url": "{{baseUrl}}/shorten"
           },
@@ -131,7 +131,7 @@
                   "",
                   "pm.test('Custom code is used', function () {",
                   "    var json = pm.response.json();",
-                  "    pm.expect(json.code).to.eql('claude-docs');",
+                  "    pm.expect(json.code).to.eql('my-repo');",
                   "});"
                 ]
               }
@@ -208,6 +208,68 @@
           ]
         },
         {
+          "name": "Get QR Code",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/{{shortCode}}/qr"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Content-Type is image/png', function () {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.eql('image/png');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Link",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/{{shortCode}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Stats After Delete (should be 404)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/{{shortCode}}/stats"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 after deletion', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Redirect Not Found",
           "request": {
             "method": "GET",
@@ -235,7 +297,7 @@
           "name": "Hit Redirect Repeatedly (run 61x to trigger 429)",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/{{shortCode}}"
+            "url": "{{baseUrl}}/my-repo"
           },
           "event": [
             {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/skip2/go-qrcode"
 
 	"shortlink/config"
 	"shortlink/models"
@@ -222,4 +223,88 @@ func GetMyLinks(c *gin.Context) {
 			"total": total,
 		},
 	})
+}
+
+// GetQRCode menghasilkan QR code (PNG) yang mengarah ke short URL.
+// Bisa langsung dibuka di browser karena response Content-Type-nya image/png.
+func GetQRCode(c *gin.Context) {
+	code := c.Param("code")
+
+	var exists bool
+	if err := config.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM links WHERE code = $1)`, code).Scan(&exists); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memeriksa link"})
+		return
+	}
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Link tidak ditemukan"})
+		return
+	}
+
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:8080"
+	}
+	shortURL := baseURL + "/" + code
+
+	png, err := qrcode.Encode(shortURL, qrcode.Medium, 256)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal generate QR code"})
+		return
+	}
+
+	c.Data(http.StatusOK, "image/png", png)
+}
+
+// DeleteLink menghapus short link milik user yang sedang login.
+// Hanya pemilik link yang bisa menghapus - link milik user lain akan return 404
+// (bukan 403) supaya tidak membocorkan informasi apakah code itu exist atau bukan.
+func DeleteLink(c *gin.Context) {
+	code := c.Param("code")
+	userID, _ := c.Get("user_id")
+
+	var linkID int
+	var ownerID int
+	err := config.DB.QueryRow(
+		`SELECT id, user_id FROM links WHERE code = $1`, code,
+	).Scan(&linkID, &ownerID)
+
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Link tidak ditemukan"})
+		return
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data link"})
+		return
+	}
+
+	if ownerID != userID.(int) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Link tidak ditemukan"})
+		return
+	}
+
+	tx, err := config.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memulai transaksi"})
+		return
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM link_visits WHERE link_id = $1`, linkID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus history klik"})
+		return
+	}
+
+	if _, err := tx.Exec(`DELETE FROM links WHERE id = $1`, linkID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus link"})
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus link"})
+		return
+	}
+
+	// Hapus juga dari cache Redis supaya tidak masih bisa redirect dari cache lama
+	config.RDB.Del(config.Ctx, "link:"+code)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Link berhasil dihapus"})
 }

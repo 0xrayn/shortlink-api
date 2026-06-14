@@ -85,7 +85,8 @@ shortlink/
 ├── middleware/auth.go          # JWT auth & Redis-based rate limiter
 ├── handlers/
 │   ├── auth_handler.go         # register & login
-│   └── link_handler.go         # create link, redirect (cache-aside), stats, my-links
+│   └── link_handler.go         # create/delete link, redirect (cache-aside), stats, QR code, my-links
+├── validators/validators.go     # custom validators (URL scheme, link code format)
 ├── routes/routes.go            # route definitions
 ├── postman/                     # Postman collection for testing
 ├── Dockerfile
@@ -162,6 +163,8 @@ POST /auth/login
 | POST | `/shorten` | Create a short link | Required | 10 req/min per IP |
 | GET | `/:code` | Redirect to the original URL | - | 60 req/min per IP |
 | GET | `/:code/stats` | Get click stats for a link | - | - |
+| GET | `/:code/qr` | Get a QR code (PNG) pointing to the short link | - | - |
+| DELETE | `/:code` | Delete a link (owner only) | Required | - |
 | GET | `/my-links` | List links created by the logged-in user | Required | - |
 
 **Create Short Link**
@@ -170,15 +173,15 @@ POST /shorten
 Authorization: Bearer <token>
 
 {
-  "url": "https://example.com/some/very/long/path"
+  "url": "https://github.com/0xrayn/shortlink-api"
 }
 ```
 
 Optionally provide a custom alias:
 ```json
 {
-  "url": "https://docs.claude.com",
-  "code": "claude-docs"
+  "url": "https://github.com/0xrayn/shortlink-api",
+  "code": "my-repo"
 }
 ```
 
@@ -188,10 +191,12 @@ Response:
   "id": 1,
   "code": "aB3xY9",
   "short_url": "http://localhost:8080/aB3xY9",
-  "original_url": "https://example.com/some/very/long/path",
+  "original_url": "https://github.com/0xrayn/shortlink-api",
   "created_at": "2026-06-14T10:00:00Z"
 }
 ```
+
+**URL validation**: the `url` field must be a valid `http://` or `https://` URL (other schemes such as `javascript:`, `ftp:`, or `file:` are rejected). The optional `code` field, if provided, must be 3-30 characters and contain only letters, numbers, hyphens, and underscores.
 
 **Redirect**
 ```
@@ -206,7 +211,7 @@ GET /aB3xY9/stats
 ```json
 {
   "code": "aB3xY9",
-  "original_url": "https://example.com/some/very/long/path",
+  "original_url": "https://github.com/0xrayn/shortlink-api",
   "click_count": 5,
   "created_at": "2026-06-14T10:00:00Z",
   "recent_visits": [
@@ -214,6 +219,19 @@ GET /aB3xY9/stats
   ]
 }
 ```
+
+**Get QR Code**
+```
+GET /aB3xY9/qr
+```
+Returns a `256x256` PNG image encoding the short URL (`http://localhost:8080/aB3xY9`). Open this URL directly in a browser to see the QR code, or scan it with a phone camera to be redirected to the original link.
+
+**Delete Link**
+```
+DELETE /aB3xY9
+Authorization: Bearer <token>
+```
+Deletes the link and its click history. Only the user who created the link can delete it; attempting to delete someone else's link (or a non-existent code) returns `404`.
 
 **Get My Links**
 ```
@@ -296,6 +314,10 @@ Screenshots of the API tested via Postman:
 **Rate limit response**
 
 ![Rate limit](./docs/screenshots/rate-limit.png)
+
+**QR code (open directly in browser)**
+
+![QR code](./docs/screenshots/qr-code.png)
 
 ---
 

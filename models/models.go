@@ -39,6 +39,6 @@ type LoginRequest struct {
 }
 
 type CreateLinkRequest struct {
-	URL  string `json:"url" binding:"required,url"`
-	Code string `json:"code"` // optional custom alias
+	URL  string `json:"url" binding:"required,url,http_url"`
+	Code string `json:"code" binding:"omitempty,min=3,max=30,linkcode"` // optional custom alias
 }
