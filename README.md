@@ -301,23 +301,23 @@ Screenshots of the API tested via Postman:
 
 **Create short link**
 
-![Create short link](./docs/screenshots/create-link.png)
+![Create short link](./docs/screenshots/create-link.jpg)
 
 **Redirect with cache**
 
-![Redirect](./docs/screenshots/redirect.png)
+![Redirect](./docs/screenshots/redirect.jpg)
 
 **Link stats**
 
-![Link stats](./docs/screenshots/stats.png)
+![Link stats](./docs/screenshots/stats.jpg)
 
 **Rate limit response**
 
-![Rate limit](./docs/screenshots/rate-limit.png)
+![Rate limit](./docs/screenshots/rate-limit.jpg)
 
 **QR code (open directly in browser)**
 
-![QR code](./docs/screenshots/qr-code.png)
+![QR code](./docs/screenshots/qr-code.jpg)
 
 ---
 
