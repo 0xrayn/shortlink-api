@@ -258,9 +258,11 @@ Authorization: Bearer <token>
 The most important part of this codebase is `RedirectLink` in `handlers/link_handler.go`. Every redirect follows the **cache-aside pattern**:
 
 1. Check Redis for `link:<code>`.
-2. **Cache hit** -> use the cached URL directly, skip the database entirely.
-3. **Cache miss** -> query PostgreSQL for the original URL, then store it in Redis with a TTL (1 hour) for future requests.
+2. **Cache hit** -> parse the composite value (stored as `link_id|original_url`). Use the `original_url` for the redirection and the `link_id` to record the visit. This completely eliminates database queries during cache hits.
+3. **Cache miss** -> query PostgreSQL for both `id` and `original_url`, then store it in Redis as `link_id|original_url` with a TTL (1 hour) for future requests.
 4. Record the visit (insert into `link_visits`, increment `click_count`) **asynchronously in a goroutine**, so the redirect response is never delayed by write operations.
+
+> **Note on Backwards Compatibility**: The cache parser is fully backwards-compatible. If it encounters a legacy cache entry containing only the URL, it automatically queries the database once to retrieve the link ID and updates the cache to the new composite format (`link_id|original_url`) on the fly.
 
 ### Rate Limiting
 
