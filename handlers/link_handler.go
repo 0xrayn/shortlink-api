@@ -70,7 +70,8 @@ func CreateLink(c *gin.Context) {
 	}
 
 	// Simpan mapping ke Redis langsung supaya redirect pertama sudah cache hit
-	config.RDB.Set(config.Ctx, "link:"+code, req.URL, cacheTTL)
+	cacheVal := strconv.Itoa(id) + "|" + req.URL
+	config.RDB.Set(config.Ctx, "link:"+code, cacheVal, cacheTTL)
 
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
