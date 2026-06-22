@@ -93,9 +93,10 @@ func RedirectLink(c *gin.Context) {
 	code := c.Param("code")
 
 	// 1. Cek cache Redis dulu
-	originalURL, err := config.RDB.Get(config.Ctx, "link:"+code).Result()
+	cachedVal, err := config.RDB.Get(config.Ctx, "link:"+code).Result()
 
 	var linkID int
+	var originalURL string
 
 	if err != nil {
 		// 2. Cache miss -> query database
@@ -112,10 +113,36 @@ func RedirectLink(c *gin.Context) {
 		}
 
 		// 3. Simpan ke cache untuk request selanjutnya
-		config.RDB.Set(config.Ctx, "link:"+code, originalURL, cacheTTL)
+		cacheVal := strconv.Itoa(linkID) + "|" + originalURL
+		config.RDB.Set(config.Ctx, "link:"+code, cacheVal, cacheTTL)
 	} else {
-		// Cache hit, tetap perlu link_id untuk catat visit & increment counter
-		config.DB.QueryRow(`SELECT id FROM links WHERE code = $1`, code).Scan(&linkID)
+		// Cache hit - coba parse format `id|url`
+		parts := strings.SplitN(cachedVal, "|", 2)
+		if len(parts) == 2 {
+			if id, parseErr := strconv.Atoi(parts[0]); parseErr == nil {
+				linkID = id
+				originalURL = parts[1]
+			}
+		}
+
+		// Fallback jika format cache tidak cocok (misal: data cache lama yang hanya berisi URL)
+		if linkID == 0 || originalURL == "" {
+			err = config.DB.QueryRow(
+				`SELECT id, original_url FROM links WHERE code = $1`, code,
+			).Scan(&linkID, &originalURL)
+
+			if err == sql.ErrNoRows {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Link tidak ditemukan"})
+				return
+			} else if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data link"})
+				return
+			}
+
+			// Simpan ulang ke cache dengan format baru
+			cacheVal := strconv.Itoa(linkID) + "|" + originalURL
+			config.RDB.Set(config.Ctx, "link:"+code, cacheVal, cacheTTL)
+		}
 	}
 
 	// Increment click count secara async-ish (fire and forget untuk performa redirect)
